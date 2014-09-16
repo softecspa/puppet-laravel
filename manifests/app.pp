@@ -5,27 +5,63 @@
 define laravel::app (
   $app_key,
   $source,
-  $ensure           = 'present',
-  $server_name      = $name,
-  $server_port      = 80,
-  $app_dir          = "/var/www/${name}",
-  $public_dirname   = 'public',
-  $owner            = $name,
-  $group            = $name,
-  $webuser          = 'www-data',
-  $source_provider  = 'git',
-  $source_username  = '',
-  $source_password  = '',
-  $mysql_host       = 'localhost',
-  $mysql_user       = $name,
-  $mysql_password   = $name,
-  $mysql_dbname     = $name,
-  $mysql_dump       = '',
-  $clean_ephimerals = false,
-  $app_debug        = false,
-  $timezone         = 'UTC',
-  $locale           = 'en',
-  $fallback_locale  = 'en'
+  $ensure                           = 'present',
+  $server_name                      = $name,
+  $server_port                      = 80,
+  $app_dir                          = "/var/www/${name}",
+  $public_dirname                   = 'public',
+  $owner                            = $name,
+  $group                            = $name,
+  $webuser                          = 'www-data',
+  $source_provider                  = 'git',
+  $source_username                  = '',
+  $source_password                  = '',
+  $mysql_host                       = 'localhost',
+  $mysql_user                       = $name,
+  $mysql_password                   = $name,
+  $mysql_dbname                     = $name,
+  $mysql_dump                       = '',
+  $clean_ephimerals                 = false,
+  $app_debug                        = false,
+  $timezone                         = 'UTC',
+  $locale                           = 'en',
+  $fallback_locale                  = 'en',
+  $backup_data                      = false,
+  $sync_data                        = false,
+  $sync_applog                      = false,
+  $backup_data_hour                 = undef,
+  $backup_data_minute               = undef,
+  $backup_data_monthday             = undef,
+  $backup_data_month                = undef,
+  $backup_data_weekday              = undef,
+  $backup_data_mail_notify          = false,
+  $backup_data_nagios_notify        = false,
+  $backup_data_mail_success         = undef,
+  $backup_data_mail_warning         = undef,
+  $backup_data_mail_failure         = undef,
+  $backup_data_nagios_service_host  = $::hostname,
+  $backup_data_nagios_service_name  = "${name}_backup_data",
+  $sync_data_hour                   = undef,
+  $sync_data_minute                 = undef,
+  $sync_data_monthday               = undef,
+  $sync_data_month                  = undef,
+  $sync_data_weekday                = undef,
+  $sync_data_mail_notify            = false,
+  $sync_data_nagios_notify          = false,
+  $sync_data_mail_success           = undef,
+  $sync_data_mail_warning           = undef,
+  $sync_data_mail_failure           = undef,
+  $sync_data_nagios_service_host    = $::hostname,
+  $sync_data_nagios_service_name    = "${name}_sync_data",
+  $sync_applog_hour                 = undef,
+  $sync_applog_minute               = undef,
+  $sync_applog_mail_notify          = false,
+  $sync_applog_nagios_notify        = false,
+  $sync_applog_mail_success         = undef,
+  $sync_applog_mail_warning         = undef,
+  $sync_applog_mail_failure         = undef,
+  $sync_applog_nagios_service_host  = $::hostname,
+  $sync_applog_nagios_service_name  = "${name}_sync_applog",
 ) {
   # validate parameters here
   if !(is_domain_name($server_name)) {
@@ -215,4 +251,62 @@ define laravel::app (
     refreshonly => true,
     subscribe   => Exec[ "${name}-composer-update" ],
   }
+
+  if $backup_data {
+    $data_dirs_to_backup = [ "${root_dir}/uploads" ]
+    backups::archive{"${name}_data_backup":
+      path                       => $data_dirs_to_backup,
+      hour                       => $backup_data_hour,
+      minute                     => $backup_data_minute,
+      monthday                   => $backup_data_monthday,
+      month                      => $backup_data_month,
+      weekday                    => $backup_data_weekday,
+      notify_mail_enable         => $backup_data_mail_notify,
+      notify_mail_success        => $backup_data_mail_success,
+      notify_mail_warning        => $backup_data_mail_warning,
+      notify_mail_failure        => $backup_data_mail_failure,
+      notify_nagios_enable       => $backup_data_nagios_notify,
+      notify_nagios_service_host => $backup_data_nagios_service_host,
+      notify_nagios_service_name => $backup_data_nagios_service_name,
+    }
+  }
+
+  if $sync_data {
+    $data_dirs_to_sync = [ "${root_dir}/uploads" ]
+    backups::sync {"${name}_data_sync":
+      path                       => $data_dirs_to_sync,
+      s3_path                    => 'data_sync',
+      hour                       => $sync_data_hour,
+      minute                     => $sync_data_minute,
+      monthday                   => $sync_data_monthday,
+      month                      => $sync_data_month,
+      weekday                    => $sync_data_weekday,
+      notify_mail_enable         => $sync_data_mail_notify,
+      notify_mail_success        => $sync_data_mail_success,
+      notify_mail_warning        => $sync_data_mail_warning,
+      notify_mail_failure        => $sync_data_mail_failure,
+      notify_nagios_enable       => $sync_data_nagios_notify,
+      notify_nagios_service_host => $sync_data_nagios_service_host,
+      notify_nagios_service_name => $sync_data_nagios_service_name,
+    }
+  }
+
+  if $sync_applog {
+    $applog_dirs  = [ "${var_dir}/logs" ] 
+    backups::sync {"${name}_applog_sync":
+      path                       => $applog_dirs,
+      s3_path                    => 'log_sync',
+      hour                       => $sync_applog_hour,
+      minute                     => $sync_applog_minute,
+      notify_mail_enable         => $sync_applog_mail_notify,
+      notify_mail_success        => $sync_applog_mail_success,
+      notify_mail_warning        => $sync_applog_mail_warning,
+      notify_mail_failure        => $sync_applog_mail_failure,
+      notify_nagios_enable       => $sync_applog_nagios_notify,
+      notify_nagios_service_host => $sync_applog_nagios_service_host,
+      notify_nagios_service_name => $sync_applog_nagios_service_name,
+    }
+  }
+
+
 }
