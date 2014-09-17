@@ -187,16 +187,16 @@ define laravel::app (
     environment => ["COMPOSER_HOME=${app_dir}"],
     creates     => "${app_dir}/composer.lock",
     tries       => 2,
-    require     => Vcsrepo[$app_dir],
+  }
+  # run composer update if install has already created lock file
+  exec { "${name}-composer-update":
+    command     => 'composer update',
+    refreshonly => true,
+    onlyif      => "test -f ${app_dir}/composer.lock",
+    tries       => 2,
   }
 
-  file { "${app_dir}/composer.lock":
-    owner   => $owner,
-    group   => $group,
-    mode    => '0664',
-    require => Exec["${name}-composer-install"],
-  }
-
+ 
   # Each module installed with composer could have migrations
   # Each module migration have to be run before app migrations
   # using the command
@@ -209,39 +209,22 @@ define laravel::app (
   $awk = "awk -F'/' '{ print $2 \"/\" $3 }'"
   # The xargs command, run the artisan command onetime foreach module
   exec { "${name}-modules-migrations":
-    command => "${find}|${awk}|xargs -0 ./artisan migrate --no-interaction --package=",
+    command     => "${find}|${awk}|xargs -0 ./artisan migrate --no-interaction --package=",
     refreshonly => true,
-    subscribe   => [
-      Exec["${name}-composer-update"],
-    ],
+    logoutput   => true,
   }
 
   exec { "${name}-migrate":
-    command     => "${app_dir}/artisan migrate",
+    command     => "${app_dir}/artisan migrate --no-interaction",
     refreshonly => true,
-    require     => Exec["${name}-modules-migrations"],
-    subscribe   => [
-      Exec["${name}-composer-update"],
-      Exec["${name}-modules-migrations"]
-    ],
   }
 
   exec { "${name}-seed":
     command     => "${app_dir}/artisan db:seed --no-interaction",
     refreshonly => true,
-    require     => Exec["${name}-migrate"],
-    subscribe   => Exec["${name}-composer-install"],
   }
 
-  # run composer and db migrations only if something change on versioned files
-  exec { "${name}-composer-update":
-    command     => 'composer update',
-    refreshonly => true,
-    onlyif      => "test -f ${app_dir}/composer.lock",
-    subscribe   => Vcsrepo[$app_dir],
-  }
-
-    # Run artisan only if composer updates something
+   # Run artisan only if composer updates something
   exec {
     [
       "${app_dir}/artisan cache:clear --no-interaction",
@@ -249,8 +232,29 @@ define laravel::app (
       "${app_dir}/artisan optimize --no-interaction",
     ]:
     refreshonly => true,
-    subscribe   => Exec[ "${name}-composer-update" ],
+    subscribe   => Exec["${name}-composer-update"],
   }
+
+  Vcsrepo[$app_dir] ->
+  Exec["${name}-composer-install"] ~>
+  Exec["${name}-modules-migrations"] ~>
+  Exec["${name}-migrate"] ~>
+  Exec["${name}-seed"]
+
+  Vcsrepo[$app_dir] ->
+  Exec["${name}-composer-update"] ~>
+  Exec["${name}-modules-migrations"] ~>
+  Exec["${name}-migrate"]
+
+  # let app owner can run composer update manually
+  file { "${app_dir}/composer.lock":
+    owner   => $owner,
+    group   => $group,
+    mode    => '0664',
+    require => Exec["${name}-composer-install"],
+  }
+
+  
 
   if $backup_data {
     $data_dirs_to_backup = [ "${root_dir}/uploads" ]
