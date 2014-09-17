@@ -155,20 +155,20 @@ define laravel::app (
 
 
   # Laravel application setup
-  file { "${app_dir}/app/config/app.php":
+  file { "${app_dir}/app/config/app.php~":
     ensure  => file,
     owner   => $owner,
     group   => $webuser,
-    mode    => '0644',
+    mode    => '0640',
     content => template('laravel/app.php.erb'),
     require => Vcsrepo[$app_dir],
   }
 
-  file { "${app_dir}/app/config/database.php":
+  file { "${app_dir}/app/config/database.php~":
     ensure  => file,
     owner   => $owner,
     group   => $webuser,
-    mode    => '0644',
+    mode    => '0640',
     content => template('laravel/database.php.erb'),
     require => Vcsrepo[$app_dir],
   }
