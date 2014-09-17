@@ -128,6 +128,7 @@ define laravel::app (
     ensure  => directory,
     owner   => $webuser,
     group   => $group,
+    recurse => true,
     mode    => '2775',
     require => Vcsrepo[$app_dir],
   }
