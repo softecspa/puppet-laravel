@@ -103,7 +103,6 @@ define laravel::app (
   $webserver_writable_dirs = [
     $var_dir,
     "${var_dir}/logs",
-    "${root_dir}/uploads",
   ]
 
   # webserver must write here and we can empty them on deploy
@@ -140,6 +139,23 @@ define laravel::app (
     group   => $group,
     mode    => '2775',
     require => Vcsrepo[$app_dir],
+  }
+
+  # TODO: questa è una porkata!
+  if $::profile::lamp::sharedpath_enable {
+    file { "${root_dir}/uploads":
+      ensure => link,
+      target => "${::profile::lamp::sharedpath_mountpoint}/$name/public/uploads",
+      require => File["${::profile::lamp::sharedpath_mountpoint}/$name/public"],
+    }
+  } else {
+    file { "${root_dir}/uploads":
+      ensure  => directory,
+      owner   => $webuser,
+      group   => $group,
+      mode    => '2775',
+      require => Vcsrepo[$app_dir],
+    }
   }
 
   if ($clean_ephimerals) {
@@ -305,7 +321,7 @@ define laravel::app (
       notify_nagios_service_host => $sync_data_nagios_service_host,
       notify_nagios_service_name => $sync_data_nagios_service_name,
     }
-  }
+  } 
 
   if $sync_applog {
     $applog_dirs  = [ "${var_dir}/logs" ] 
@@ -324,6 +340,5 @@ define laravel::app (
       notify_nagios_service_name => $sync_applog_nagios_service_name,
     }
   }
-
-
 }
+
