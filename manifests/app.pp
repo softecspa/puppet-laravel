@@ -88,7 +88,14 @@ define laravel::app (
   # virtualhost document root, public files
   $root_dir    = "${app_dir}/${public_dirname}"
   # app generated files
-  $var_dir     = "${app_dir}/app/storage"
+  $var_dir     = "/var/local/${name}"
+
+  # Fix default storage dir
+  file { "${app_dir}/app/storage":
+    ensure => 'link',
+    target => $var_dir,
+    force  => true,
+  }
 
   $webserver_writable_dirs = [
     $var_dir,
@@ -128,7 +135,6 @@ define laravel::app (
     ensure  => directory,
     owner   => $webuser,
     group   => $group,
-    recurse => true,
     mode    => '2775',
     require => Vcsrepo[$app_dir],
   }
@@ -159,7 +165,7 @@ define laravel::app (
     ensure  => file,
     owner   => $owner,
     group   => $webuser,
-    mode    => '0640',
+    mode    => '0440',
     content => template('laravel/app.php.erb'),
     require => Vcsrepo[$app_dir],
   }
@@ -168,7 +174,7 @@ define laravel::app (
     ensure  => file,
     owner   => $owner,
     group   => $webuser,
-    mode    => '0640',
+    mode    => '0440',
     content => template('laravel/database.php.erb'),
     require => Vcsrepo[$app_dir],
   }
@@ -185,16 +191,16 @@ define laravel::app (
   # Run composer install only if .lock file does not exists
   exec { "${name}-composer-install":
     command     => 'composer install',
-    environment => ["COMPOSER_HOME=${app_dir}"],
+    environment => [ "COMPOSER_HOME=${app_dir}" ],
     creates     => "${app_dir}/composer.lock",
-    tries       => 2,
   }
   # run composer update if install has already created lock file
+  # and only if vcsrepo notify me any change
   exec { "${name}-composer-update":
     command     => 'composer update',
+    environment => [ "COMPOSER_HOME=${app_dir}" ],
     refreshonly => true,
     onlyif      => "test -f ${app_dir}/composer.lock",
-    tries       => 2,
   }
 
  
@@ -242,12 +248,12 @@ define laravel::app (
   Exec["${name}-migrate"] ~>
   Exec["${name}-seed"]
 
-  Vcsrepo[$app_dir] ->
+  Vcsrepo[$app_dir] ~>
   Exec["${name}-composer-update"] ~>
   Exec["${name}-modules-migrations"] ~>
   Exec["${name}-migrate"]
 
-  # let app owner can run composer update manually
+  # let app owner&group run composer update manually
   file { "${app_dir}/composer.lock":
     owner   => $owner,
     group   => $group,
