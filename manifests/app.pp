@@ -9,6 +9,7 @@ define laravel::app (
   $server_name                      = $name,
   $server_port                      = 80,
   $app_dir                          = "/var/www/${name}",
+  $app_var                          = "/var/local/${name}",
   $public_dirname                   = 'public',
   $owner                            = $name,
   $group                            = $name,
@@ -91,14 +92,7 @@ define laravel::app (
   # virtualhost document root, public files
   $root_dir    = "${app_dir}/${public_dirname}"
   # app generated files
-  $var_dir     = "/var/local/${name}"
-
-  # Fix default storage dir
-  file { "${app_dir}/app/storage":
-    ensure => 'link',
-    target => $var_dir,
-    force  => true,
-  }
+  $var_dir     = "${app_var}/storage"
 
   $webserver_writable_dirs = [
     $var_dir,
@@ -145,6 +139,7 @@ define laravel::app (
   if $::profile::lamp::sharedpath_enable {
     file { "${root_dir}/uploads":
       ensure => link,
+      force => true,
       target => "${::profile::lamp::sharedpath_mountpoint}/$name/public/uploads",
       require => File["${::profile::lamp::sharedpath_mountpoint}/$name/public"],
     }
