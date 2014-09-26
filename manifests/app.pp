@@ -110,10 +110,11 @@ define laravel::app (
 
   if ! defined(File[$app_dir]) {
     file { $app_dir:
-      ensure => directory,
-      owner  => $owner,
-      group  => $group,
-      mode   => '2775',
+      ensure  => directory,
+      owner   => $owner,
+      group   => $group,
+      mode    => '664',
+      recurse => true,
     }
   }
 
