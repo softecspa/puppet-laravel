@@ -33,6 +33,7 @@ define laravel::app (
   $sync_data_cron_prepend           = undef,
   $sync_applog                      = false,
   $sync_applog_cron_prepend         = undef,
+  $logship_applog                   = false,
   $backup_data_hour                 = undef,
   $backup_data_minute               = undef,
   $backup_data_monthday             = undef,
@@ -66,6 +67,18 @@ define laravel::app (
   $sync_applog_mail_failure         = undef,
   $sync_applog_nagios_service_host  = $::hostname,
   $sync_applog_nagios_service_name  = "${name}_sync_applog",
+  $logship_applog_data_collector    = undef,
+  $logship_applog_destination       = undef,
+  $logship_applog_log_file          = undef,
+  $logship_applog_fluentd_pos_dir   = undef,
+  $logship_applog_fluentd_type      = undef,
+  $logship_applog_fluentd_format    = undef,
+  $logship_applog_fluentd_match_config  = undef,
+  $aws_key_id                           = undef,
+  $aws_sec_key                          = undef,
+  $logship_applog_s3_bucket             = undef,
+  $logship_applog_s3_bucket_endpoint    = undef,
+  $logship_applog_s3_path               = undef,
 ) {
   # validate parameters here
   if !(is_domain_name($server_name)) {
@@ -334,6 +347,23 @@ define laravel::app (
       notify_nagios_enable       => $sync_applog_nagios_notify,
       notify_nagios_service_host => $sync_applog_nagios_service_host,
       notify_nagios_service_name => $sync_applog_nagios_service_name,
+    }
+  }
+
+  if $logship_applog {
+    logship::manage {"${name}_app_log":
+      log_path             => "${var_dir}/logs/${logship_applog_log_file}",
+      data_collector       => $logship_applog_data_collector,
+      destination          => $logship_applog_destination,
+      fluentd_type         => $logship_applog_fluentd_type,
+      fluentd_format       => $logship_applog_fluentd_format,
+      fluentd_match_config => $logship_applog_fluentd_match_config,
+      fluentd_pos_dir      => $logship_applog_fluentd_pos_dir,
+      aws_key_id           => $aws_key_id,
+      aws_sec_key          => $aws_sec_key,
+      s3_bucket            => $logship_applog_s3_bucket,
+      s3_endpoint          => $logship_applog_s3_bucket_endpoint,
+      s3_path              => $logship_applog_s3_path,
     }
   }
 }
