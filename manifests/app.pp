@@ -46,6 +46,7 @@ define laravel::app (
   $backup_data_mail_failure         = undef,
   $backup_data_nagios_service_host  = $::hostname,
   $backup_data_nagios_service_name  = "${name}_backup_data",
+  $backup_data_export_doc           = false,
   $sync_data_hour                   = undef,
   $sync_data_minute                 = undef,
   $sync_data_monthday               = undef,
@@ -58,6 +59,7 @@ define laravel::app (
   $sync_data_mail_failure           = undef,
   $sync_data_nagios_service_host    = $::hostname,
   $sync_data_nagios_service_name    = "${name}_sync_data",
+  $sync_data_export_doc             = false,
   $sync_applog_hour                 = undef,
   $sync_applog_minute               = undef,
   $sync_applog_mail_notify          = false,
@@ -67,6 +69,7 @@ define laravel::app (
   $sync_applog_mail_failure         = undef,
   $sync_applog_nagios_service_host  = $::hostname,
   $sync_applog_nagios_service_name  = "${name}_sync_applog",
+  $sync_applog_export_doc           = false,
   $logship_applog_data_collector    = undef,
   $logship_applog_destination       = undef,
   $logship_applog_log_file          = undef,
@@ -79,6 +82,10 @@ define laravel::app (
   $logship_applog_s3_bucket             = undef,
   $logship_applog_s3_bucket_endpoint    = undef,
   $logship_applog_s3_path               = undef,
+  $export_backup_doc_fragment      = undef,
+  $backup_doc_fragment_path        = undef,
+  $backup_doc_fragment_name         = undef,
+  $backup_doc_format                = undef,
 ) {
   # validate parameters here
   if !(is_domain_name($server_name)) {
@@ -291,8 +298,8 @@ define laravel::app (
 
   
 
+  $data_dirs_to_backup = [ "${root_dir}/uploads" ]
   if $backup_data {
-    $data_dirs_to_backup = [ "${root_dir}/uploads" ]
     backups::archive{"${name}_data_backup":
       path                       => $data_dirs_to_backup,
       hour                       => $backup_data_hour,
@@ -309,13 +316,43 @@ define laravel::app (
       notify_nagios_service_host => $backup_data_nagios_service_host,
       notify_nagios_service_name => $backup_data_nagios_service_name,
     }
+    
+    $ensure_doc_backup_data = 'present'
+  } else {
+    $ensure_doc_backup_data = 'absent'
   }
 
+  $real_ensure_doc_backup_data = $export_backup_doc_fragment ? {
+    false       => 'absent',
+    default => $ensure_doc_backup_data
+  }
+
+  if $backup_data_cron_prepend {
+    $data_backup_note = "exec only if: $backup_data_cron_prepend,"
+  } else {
+    $data_backup_note = ''
+  }
+
+  #TODO: actually only S3 is supported in backups module. Make destination dinamic
+  concat::fragment {"${backup_doc_format}_backup_data_${name}":
+    ensure  => $real_ensure_doc_backup_data,
+    target  => "${backup_doc_fragment_path}/${backup_doc_fragment_name}",
+    content => template("laravel/doc/${backup_doc_format}_backup_data.erb"),
+    order   => '31'
+  }
+
+  #concat::fragment {"trac_data_backup_${name}":
+  #  ensure  => $ensure_trac_backup_data,
+  #  target  => $profile::lamp::backup::target_trac_file,
+  #  content => "||${name}||S3 ${profile::lamp::backup::s3_bucket}||${::fqdn}/${name}_db/||${backup_db_minute} ${backup_db_hour} * * *||${note}||",
+  #  order   => '31'
+  #}
+
+  $data_dirs_to_sync = [ "${root_dir}/uploads" ]
   if $sync_data {
-    $data_dirs_to_sync = [ "${root_dir}/uploads" ]
     backups::sync {"${name}_data_sync":
       path                       => $data_dirs_to_sync,
-      s3_path                    => 'data_sync',
+      s3_path                    => "${name}_data_sync",
       hour                       => $sync_data_hour,
       minute                     => $sync_data_minute,
       monthday                   => $sync_data_monthday,
@@ -330,13 +367,36 @@ define laravel::app (
       notify_nagios_service_host => $sync_data_nagios_service_host,
       notify_nagios_service_name => $sync_data_nagios_service_name,
     }
-  } 
 
+    $ensure_doc_sync_data = 'present'
+  } else {
+    $ensure_doc_sync_data = 'absent'
+  }
+
+  $real_ensure_doc_sync_data = $export_backup_doc_fragment ? {
+    false   => 'absent',
+    default => $ensure_doc_sync_data
+  }
+
+  if $sync_data_cron_prepend {
+    $data_sync_note = "exec only if: $sync_data_cron_prepend,"
+  } else {
+    $data_sync_note = ''
+  }
+
+  #TODO: actually only S3 is supported in backups module. Make destination dinamic
+  concat::fragment {"${backup_doc_format}_sync_data_${name}":
+    ensure  => $real_ensure_doc_sync_data,
+    target  => "${backup_doc_fragment_path}/${backup_doc_fragment_name}",
+    content => template("laravel/doc/${backup_doc_format}_sync_data.erb"),
+    order   => '32'
+  }
+
+  $applog_dirs  = [ "${var_dir}/logs" ]
   if $sync_applog {
-    $applog_dirs  = [ "${var_dir}/logs" ] 
     backups::sync {"${name}_applog_sync":
       path                       => $applog_dirs,
-      s3_path                    => 'log_sync',
+      s3_path                    => "${name}_applog_sync",
       hour                       => $sync_applog_hour,
       minute                     => $sync_applog_minute,
       cron_prepend               => $sync_applog_cron_prepend,
@@ -348,6 +408,29 @@ define laravel::app (
       notify_nagios_service_host => $sync_applog_nagios_service_host,
       notify_nagios_service_name => $sync_applog_nagios_service_name,
     }
+
+    $ensure_doc_sync_applog = 'present'
+  } else {
+    $ensure_doc_sync_applog = 'absent'
+  }
+
+  $real_ensure_doc_sync_applog = $export_backup_doc_fragment ? {
+    false   => 'absent',
+    default => $ensure_doc_sync_applog
+  }
+
+  if $sync_applog_cron_prepend {
+    $applog_sync_note = "exec only if: $sync_applog_cron_prepend,"
+  } else {
+    $applog_sync_note = ''
+  }
+
+  #TODO: actually only S3 is supported in backups module. Make destination dinamic
+  concat::fragment {"${backup_doc_format}_sync_applog_${name}":
+    ensure  => $real_ensure_doc_sync_applog,
+    target  => "${backup_doc_fragment_path}/${backup_doc_fragment_name}",
+    content => template("laravel/doc/${backup_doc_format}_sync_applog.erb"),
+    order   => '33'
   }
 
   if $logship_applog {

@@ -1,0 +1,3 @@
+<% @data_dirs_to_backup.each do |dir| -%>
+||<%= dir -%>||S3 <%= scope.lookupvar('profile::lamp::backup::s3_bucket') -%>||<%= @fqdn -%>/<%= @name %>_data_backup||<%= @sync_data_minute -%> <%= @sync_data_hour -%> <%= @sync_data_monthday? @sync_data_monthday : '*' -%> <%= @sync_data_month? @sync_data_month : '*' -%> <%= @sync_data_weekday? @sync_data_weekday : '*' -%>||Backup||<%= @data_backup_note %>||
+<% end -%>

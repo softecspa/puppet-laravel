@@ -1,0 +1,3 @@
+<% @applog_dirs.each do |dir| -%>
+||<%= dir -%>||S3 <%= scope.lookupvar('profile::lamp::backup::s3_bucket') -%>||<%= @fqdn -%>/<%= @name -%>_log_sync||<%= @sync_applog_minute -%> <%= @sync_applog_hour -%> <%= @sync_applog_monthday? @sync_applog_monthday : '*' -%> <%= @sync_applog_month? @sync_applog_month : '*' -%> <%= @sync_applog_weekday? @sync_applog_weekday : '*' -%>||Sync||<%= @applog_sync_note %>||
+<% end -%>
