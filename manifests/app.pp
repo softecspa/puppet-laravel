@@ -214,20 +214,14 @@ define laravel::app (
     require => Vcsrepo[$app_dir],
   }
 
-  # All execs must be executed from the application home
-  # and by the Owner of the laravel app, so file permissions
-  # permits user to modify anything created by composer or artisan
-  Exec {
-    cwd  => $app_dir,
-    user => $owner,
-  }
-
   ## Laravel one-time setup
   # Run composer install only if .lock file does not exists
   exec { "${name}-composer-install":
     command     => 'composer install',
     environment => [ "COMPOSER_HOME=${app_dir}" ],
     creates     => "${app_dir}/composer.lock",
+    cwd         => $app_dir,
+    user        => $owner,
   }
   # run composer update if install has already created lock file
   # and only if vcsrepo notify me any change
@@ -236,6 +230,8 @@ define laravel::app (
     environment => [ "COMPOSER_HOME=${app_dir}" ],
     refreshonly => true,
     onlyif      => "test -f ${app_dir}/composer.lock",
+    cwd         => $app_dir,
+    user        => $owner,
   }
 
  
@@ -254,16 +250,22 @@ define laravel::app (
     command     => "${find}|${awk}|xargs -0 ./artisan migrate --no-interaction --package=",
     refreshonly => true,
     logoutput   => true,
+    cwd         => $app_dir,
+    user        => $owner,
   }
 
   exec { "${name}-migrate":
     command     => "${app_dir}/artisan migrate --no-interaction",
     refreshonly => true,
+    cwd         => $app_dir,
+    user        => $owner,
   }
 
   exec { "${name}-seed":
     command     => "${app_dir}/artisan db:seed --no-interaction",
     refreshonly => true,
+    cwd         => $app_dir,
+    user        => $owner,
   }
 
    # Run artisan only if composer updates something
@@ -275,6 +277,8 @@ define laravel::app (
     ]:
     refreshonly => true,
     subscribe   => Exec["${name}-composer-update"],
+    cwd         => $app_dir,
+    user        => $owner,
   }
 
   Vcsrepo[$app_dir] ->
@@ -434,6 +438,12 @@ define laravel::app (
   }
 
   if $logship_applog {
+
+    Exec {
+      cwd  => undef,
+      user => undef,
+    }
+
     logship::manage {"${name}_app_log":
       log_path             => "${var_dir}/logs/${logship_applog_log_file}",
       data_collector       => $logship_applog_data_collector,
