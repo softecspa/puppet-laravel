@@ -328,7 +328,7 @@ define laravel::app (
   }
 
   if $backup_data_cron_prepend {
-    $data_backup_note = "exec only if: $backup_data_cron_prepend,"
+    $data_backup_note = "exec only if: $backup_data_cron_prepend"
   } else {
     $data_backup_note = ''
   }
@@ -379,7 +379,7 @@ define laravel::app (
   }
 
   if $sync_data_cron_prepend {
-    $data_sync_note = "exec only if: $sync_data_cron_prepend,"
+    $data_sync_note = "exec only if: $sync_data_cron_prepend"
   } else {
     $data_sync_note = ''
   }
@@ -420,7 +420,7 @@ define laravel::app (
   }
 
   if $sync_applog_cron_prepend {
-    $applog_sync_note = "exec only if: $sync_applog_cron_prepend,"
+    $applog_sync_note = "exec only if: $sync_applog_cron_prepend"
   } else {
     $applog_sync_note = ''
   }
