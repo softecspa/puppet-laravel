@@ -9,7 +9,7 @@
   "project_page": "https://github.com/lorello/laravel-puppet",
   "dependencies": [
     { "name": "puppetlabs/stdlib", "version_requirement": ">= 2.4.0" },
-    { "name": "puppetlabs/vcsrepo", "version_requirement":"> 0.0.0"}
+    { "name": "puppetlabs/vcsrepo", "version_requirement":">= 1.1.0"}
   ],
   "requirements": [
     {
