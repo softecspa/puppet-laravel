@@ -1,7 +1,7 @@
 #!/usr/bin/env ruby
 #^syntax detection
 
-forge "https://forgeapi.puppetlabs.com"
+#forge "https://forgeapi.puppetlabs.com"
 
-mod 'puppetlabs/vcsrepo'
+#mod 'puppetlabs/vcsrepo'
 
