@@ -345,13 +345,6 @@ define laravel::app (
     order   => '31'
   }
 
-  #concat::fragment {"trac_data_backup_${name}":
-  #  ensure  => $ensure_trac_backup_data,
-  #  target  => $profile::lamp::backup::target_trac_file,
-  #  content => "||${name}||S3 ${profile::lamp::backup::s3_bucket}||${::fqdn}/${name}_db/||${backup_db_minute} ${backup_db_hour} * * *||${note}||",
-  #  order   => '31'
-  #}
-
   $data_dirs_to_sync = [ "${root_dir}/uploads" ]
   if $sync_data {
     backups::sync {"${name}_data_sync":
