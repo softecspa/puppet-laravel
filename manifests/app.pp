@@ -14,6 +14,7 @@ define laravel::app (
   $owner                            = $name,
   $group                            = $name,
   $webuser                          = 'www-data',
+  $strict_permissions               = false,
   $source_provider                  = 'git',
   $source_username                  = '',
   $source_password                  = '',
@@ -128,22 +129,75 @@ define laravel::app (
     "${var_dir}/meta",
   ]
 
+  $real_owner = $strict_permissions?{
+    true  => 'root',
+    false => $owner
+  }
+
+  $app_dir_mode = $strict_permissions?{
+    true  => '0644',
+    false => '0666'
+  }
+
+  $vendor_dir_mode = $strict_permissions?{
+    true  => '2644',
+    false => '2666'
+  }
+
+  $root_dir_mode = $strict_permissions?{
+    true  => '2644',
+    false => '2666'
+  }
+
+  exec{"create_${app_dir}":
+    command => "mkdir ${app_dir}",
+    creates => $app_dir
+  }
+
+  vcsrepo { $app_dir:
+    ensure              => $ensure,
+    source              => $source,
+    provider            => $source_provider,
+    basic_auth_username => $source_username,
+    basic_auth_password => $source_password,
+    owner               => $real_owner,
+    group               => $group,
+    require             => Exec["create_${app_dir}"],
+  }
+
   if ! defined(File[$app_dir]) {
     file { $app_dir:
       ensure  => directory,
-      owner   => $owner,
+      owner   => $real_owner,
       group   => $group,
-      mode    => '664',
+      ignore  => ['.svn', 'artisan$', 'vendor'],
+      mode    => $app_dir_mode,
       recurse => true,
+      require => Vcsrepo[$app_dir]
     }
+  }
+
+  file {"${app_dir}/vendor":
+    ensure  => directory,
+    owner   => $real_owner,
+    group   => $group,
+    mode    => $vendor_dir_mode,
+    require => Vcsrepo[$app_dir]
+  }
+
+  file {"${app_dir}/artisan":
+    owner   => $real_owner,
+    group   => $group,
+    mode    => 'u+x',
+    require => Vcsrepo[$app_dir]
   }
 
   if ! defined(File[$root_dir]) {
     file { $root_dir:
       ensure  => directory,
-      owner   => $owner,
+      owner   => $real_owner,
       group   => $group,
-      mode    => '2775',
+      mode    => $root_dir_mode,
       require => Vcsrepo[$app_dir],
     }
   }
@@ -183,18 +237,6 @@ define laravel::app (
     }
   }
 
-  vcsrepo { $app_dir:
-    ensure              => $ensure,
-    source              => $source,
-    provider            => $source_provider,
-    basic_auth_username => $source_username,
-    basic_auth_password => $source_password,
-    owner               => $owner,
-    group               => $group,
-    require             => File[$app_dir],
-  }
-
-
   # Laravel application setup
   file { "${app_dir}/app/config/app.php~":
     ensure  => file,
@@ -221,7 +263,9 @@ define laravel::app (
     environment => [ "COMPOSER_HOME=${app_dir}" ],
     creates     => "${app_dir}/composer.lock",
     cwd         => $app_dir,
-    user        => $owner,
+    user        => $real_owner,
+    timeout     => 900,
+    require     => File["${app_dir}/vendor"]
   }
   # run composer update if install has already created lock file
   # and only if vcsrepo notify me any change
@@ -231,7 +275,8 @@ define laravel::app (
     refreshonly => true,
     onlyif      => "test -f ${app_dir}/composer.lock",
     cwd         => $app_dir,
-    user        => $owner,
+    user        => $real_owner,
+    require     => File["${app_dir}/vendor"]
   }
 
  
@@ -251,21 +296,24 @@ define laravel::app (
     refreshonly => true,
     logoutput   => true,
     cwd         => $app_dir,
-    user        => $owner,
+    user        => $real_owner,
+    require     => File["${app_dir}/artisan"]
   }
 
   exec { "${name}-migrate":
     command     => "${app_dir}/artisan migrate --no-interaction",
     refreshonly => true,
     cwd         => $app_dir,
-    user        => $owner,
+    user        => $real_owner,
+    require     => File["${app_dir}/artisan"]
   }
 
   exec { "${name}-seed":
     command     => "${app_dir}/artisan db:seed --no-interaction",
     refreshonly => true,
     cwd         => $app_dir,
-    user        => $owner,
+    user        => $real_owner,
+    require     => File["${app_dir}/artisan"]
   }
 
    # Run artisan only if composer updates something
@@ -278,7 +326,8 @@ define laravel::app (
     refreshonly => true,
     subscribe   => Exec["${name}-composer-update"],
     cwd         => $app_dir,
-    user        => $owner,
+    user        => $real_owner,
+    require     => File["${app_dir}/artisan"]
   }
 
   Vcsrepo[$app_dir] ->
@@ -294,7 +343,7 @@ define laravel::app (
 
   # let app owner&group run composer update manually
   file { "${app_dir}/composer.lock":
-    owner   => $owner,
+    owner   => $real_owner,
     group   => $group,
     mode    => '0664',
     require => Exec["${name}-composer-install"],
